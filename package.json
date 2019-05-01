@@ -1,0 +1,25 @@
+{
+  "name": "jianshu-crawler",
+  "version": "0.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "ts-node ./main.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^11.13.8",
+    "ts-node": "^8.1.0",
+    "typescript": "^3.4.5"
+  },
+  "dependencies": {
+    "@types/axios": "^0.14.0",
+    "@types/cheerio": "^0.22.11",
+    "@types/jsdom": "^12.2.3",
+    "@types/showdown": "^1.9.2",
+    "axios": "^0.18.0",
+    "cheerio": "^1.0.0-rc.3",
+    "jsdom": "^15.0.0",
+    "showdown": "^1.9.0"
+  }
+}
