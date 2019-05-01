@@ -2,7 +2,7 @@
 之前一直在简书写文章，现在希望把自己的文章转移到个人博客上面，此爬虫会将所有的个人文章爬下来，转换成 markdown 保存在本地。
 
 ![爬取中](./sources/fetching.gif)
-![爬取结果](./sources/result.jpeg)
+![爬取结果](./sources/result.png)
 
 ## Usage
 * node: ^v10.x
