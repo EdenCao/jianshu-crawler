@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import * as path from 'path';
 import * as fs from 'fs';
+// @ts-ignore
+import youdao from 'youdao-node';
 import { Converter } from 'showdown';
 import { JSDOM } from 'jsdom';
 import { URL } from 'url';
@@ -10,13 +12,17 @@ const resolve = (_path: string) => new URL(_path, prefix).toString();
 
 const prefix = 'https://www.jianshu.com/';
 
-
-
 type Config = {
   uid: string;
   articlePage: number;
   dist: string;
+  translation: {
+    "appKey": string,
+    "appSecret": string
+  }
 }
+
+type Article = { title: string; content: string }
 
 export async function run(config: Config) {
   const articleList = await fetchJianShuArticleUrl(config);
@@ -24,9 +30,14 @@ export async function run(config: Config) {
   redirectMarkdown(config, articles);
 }
 
-function redirectMarkdown(config: Config, articles: {title: string; content: string}[]) { 
+async function redirectMarkdown(config: Config, articles: Article[]) {
+  if (config.translation.appKey !== '') {
+    await translateLanguage(config, articles);
+  }
   for (let article of articles) {
     let mdArticle = new Converter().makeMarkdown(article.content, new JSDOM(article.content).window.document)
+    // 主要是为了生成 hexo 的 post 文件格式
+    mdArticle = `---\ntitle: ${article.title}\n---\n\n${mdArticle}`;
     fs.writeFileSync(path.resolve(config.dist, article.title + '.md'), mdArticle);
   }
 }
@@ -39,16 +50,20 @@ async function fetchArticleContent(config: Config, urlList: string[]) {
   for (let url of urlList) {
     const result = await axios.get(resolve(url)).catch((e) => { throw e });
     const $article = cheerio.load(result.data);
-    const title = $article('title').text()
+    const title = $article('title').text().split(' - 简书').join('');
     console.log(`has download article ${title}`);
+    $article('div.image-package')
+      .each((_, elem) => {
+        let imageWrapper = $article(elem);
+        let imageSrc = imageWrapper.find('.image-view img').attr('data-original-src')
+        let caption = imageWrapper.find('.image-caption').text();
+        imageWrapper.replaceWith(`<img src="${imageSrc}" alt="${caption}" >`)
+      })
 
-    $article('.post .article .show-content .show-content-free')
-      .each(function (i, elem) {
-        articles.push({
-          title,
-          content: '<h1>' + title + '</h1>' + $article(elem).html()
-        })
-      });
+    articles.push({
+      title,
+      content: $article('.post .article .show-content .show-content-free').html() || ''
+    })
   }
 
   return articles;
@@ -76,3 +91,32 @@ async function fetchJianShuArticleUrl(config: Config) {
   return urlList;
 }
 
+// https://cloud.google.com/translate/docs/quickstart-client-libraries#client-libraries-install-nodejs
+async function translateLanguage(config: Config, articles: Article[]) {
+  console.log('开始翻译标题...')
+  youdao.config({
+    appKey: config.translation!.appKey,
+    appSecret: config.translation!.appSecret
+  });
+  for (let articleIndex in articles) {
+    let article = articles[articleIndex];
+    const data = await youdao.translate({
+      content: article.title,
+      from: 'zh-CHS',
+      to: 'en'
+    });
+    console.log(`${articleIndex}/${articles.length} source: ${article.title}, to: ${data.translation}`)
+    console.log(typeof data.translation);
+    article.title = String(data.translation)
+      .split(' ')
+      .map(
+        w => { 
+          let s = w.split(''); 
+          s[0] = s[0].toUpperCase(); 
+          return s.join('') 
+      })
+      .join('-')
+  }
+  console.log('全部翻译完成')
+  return;
+}

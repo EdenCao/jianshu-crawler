@@ -27,6 +27,8 @@ articlePage: 就是当前页面文章页数，鉴于简书是无限滚动所以�
 dist: 就是你希望把下载下来的文章存放的位置，必须是已经存在的目录。就是说如果你选择 ./dist/ 作为目录的话，需要现先在本项目中新建一个 dist/ 目录。
 我在项目中提供了一个事例，直接重命名 config.example为config.json就可以了
 
+translation 字段不需要填写也可以，如果需要将生成的文章名称改为英文，需要自己去有道智云申请一个 appid 和秘钥，appKey 填写 appID，appSecret 填写秘钥就可以了。
+
 * 启动项目
 ```sh
 yarn start

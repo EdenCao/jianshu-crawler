@@ -1,5 +1,9 @@
 {
   "uid": "d99a7dfae9e4",
   "articlePage": 14,
-  "dist": "./articles/"
+  "dist": "./articles/",
+  "translation": {
+    "appKey": "",
+    "appSecret": ""
+  }
 }
