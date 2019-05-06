@@ -38,7 +38,7 @@ async function redirectMarkdown(config: Config, articles: Article[]) {
     let mdArticle = new Converter().makeMarkdown(article.content, new JSDOM(article.content).window.document)
     // 主要是为了生成 hexo 的 post 文件格式
     mdArticle = `---\ntitle: ${article.title}\n---\n\n${mdArticle}`;
-    fs.writeFileSync(path.resolve(config.dist, `${article.titleTranslation || article.title}`), mdArticle);
+    fs.writeFileSync(path.resolve(config.dist, `${article.titleTranslation || article.title}.md`), mdArticle);
   }
 }
 
