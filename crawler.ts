@@ -4,7 +4,6 @@ import * as fs from 'fs';
 // @ts-ignore
 import youdao from 'youdao-node';
 import { Converter } from 'showdown';
-import { JSDOM } from 'jsdom';
 import { URL } from 'url';
 import { default as axios } from 'axios';
 
