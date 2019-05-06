@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import * as path from 'path';
 import * as fs from 'fs';
+import { JSDOM } from 'jsdom';
 // @ts-ignore
 import youdao from 'youdao-node';
 import { Converter } from 'showdown';
@@ -21,7 +22,7 @@ type Config = {
   }
 }
 
-type Article = { title: string; content: string }
+type Article = { title: string; content: string; titleTranslation?: string }
 
 export async function run(config: Config) {
   const articleList = await fetchJianShuArticleUrl(config);
@@ -37,7 +38,7 @@ async function redirectMarkdown(config: Config, articles: Article[]) {
     let mdArticle = new Converter().makeMarkdown(article.content, new JSDOM(article.content).window.document)
     // 主要是为了生成 hexo 的 post 文件格式
     mdArticle = `---\ntitle: ${article.title}\n---\n\n${mdArticle}`;
-    fs.writeFileSync(path.resolve(config.dist, article.title + '.md'), mdArticle);
+    fs.writeFileSync(path.resolve(config.dist, `${article.titleTranslation || article.title}`), mdArticle);
   }
 }
 
@@ -106,7 +107,7 @@ async function translateLanguage(config: Config, articles: Article[]) {
     });
     console.log(`${articleIndex}/${articles.length} source: ${article.title}, to: ${data.translation}`)
     console.log(typeof data.translation);
-    article.title = String(data.translation)
+    article.titleTranslation = String(data.translation)
       .split(' ')
       .map(
         w => { 
