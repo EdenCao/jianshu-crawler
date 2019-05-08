@@ -22,51 +22,102 @@ type Config = {
   }
 }
 
-type Article = { title: string; content: string; titleTranslation?: string }
+type Article = {
+  title: string;
+  content: string;
+  images: {
+    caption: string;
+    content: Buffer;
+  }[];
+  titleTranslation?: string;
+}
 
 export async function run(config: Config) {
-  const articleList = await fetchJianShuArticleUrl(config);
-  const articles = await fetchArticleContent(config, articleList);
-  redirectMarkdown(config, articles);
+  try {
+    const articleList = await fetchJianShuArticleUrl(config);
+    const articles = await fetchArticleContent(config, articleList);
+    redirectMarkdown(config, articles);
+  } catch (e) {
+    console.error(e);
+  }
+
 }
 
 async function redirectMarkdown(config: Config, articles: Article[]) {
   if (config.translation.appKey !== '') {
     await translateLanguage(config, articles);
   }
+  console.log('开始写入文件');
   for (let article of articles) {
+    console.log('开始生成 ' + article.title);
     let mdArticle = new Converter().makeMarkdown(article.content, new JSDOM(article.content).window.document)
     // 主要是为了生成 hexo 的 post 文件格式
     mdArticle = `---\ntitle: ${article.title}\n---\n\n${mdArticle}`;
-    fs.writeFileSync(path.resolve(config.dist, `${article.titleTranslation || article.title}.md`), mdArticle);
+    let dist = path.resolve(config.dist, article.titleTranslation!);
+    await mkdir(dist);
+    fs.writeFileSync(path.resolve(dist, `${article.titleTranslation || article.title}.md`), mdArticle);
+    console.log('has generate md: ' + article.title);
+    for (let image of article.images) {
+      fs.writeFileSync(path.resolve(dist, image.caption), image.content);
+      console.log('has generate image: ' + image.caption);
+    }
   }
 }
 
-async function fetchArticleContent(config: Config, urlList: string[]) {
+async function fetchArticleContent(config: Config, urlList: string[]): Promise<Article[]> {
   const articles: {
     title: string;
     content: string;
+    images: {
+      caption: string;
+      content: Buffer;
+    }[]
   }[] = [];
   for (let url of urlList) {
     const result = await axios.get(resolve(url)).catch((e) => { throw e });
     const $article = cheerio.load(result.data);
     const title = $article('title').text().split(' - 简书').join('');
     console.log(`has download article ${title}`);
+    let imageUrls: { url: string; caption: string }[] = [];
+    let images: { caption: string; content: Buffer }[] = [];
+    const salts: string[] = [];
     $article('div.image-package')
-      .each((_, elem) => {
+      .each(async (_, elem) => {
         let imageWrapper = $article(elem);
         let imageSrc = imageWrapper.find('.image-view img').attr('data-original-src')
-        let caption = imageWrapper.find('.image-caption').text();
-        imageWrapper.replaceWith(`<img src="${imageSrc}" alt="${caption}" >`)
+        // 防止图片重名
+        let salt = getSalt(5, salts);
+        salts.push(salt);
+        let caption = salt + '$' + imageWrapper.find('.image-caption').text();
+        imageWrapper.replaceWith(`<img src="./${caption}" alt="${caption}" >`)
+        imageUrls.push({
+          caption,
+          url: 'https:' + imageSrc
+        });
       })
-
+    for (let imageInfo of imageUrls) {
+      let image = await fetchArticleImages(imageInfo.url);
+      images.push({
+        caption: imageInfo.caption,
+        content: image
+      });
+      console.log('has download image ' + imageInfo.caption + 'in ' + title);
+    }
     articles.push({
       title,
-      content: $article('.post .article .show-content .show-content-free').html() || ''
+      content: $article('.post .article .show-content .show-content-free').html() || '',
+      images
     })
   }
 
   return articles;
+}
+
+async function fetchArticleImages(url: string): Promise<Buffer> {
+  let res = await axios.get(url, {
+    responseType: 'arraybuffer'
+  })
+  return Buffer.alloc(res.data.length, res.data, 'binary');
 }
 
 async function fetchJianShuArticleUrl(config: Config) {
@@ -110,13 +161,43 @@ async function translateLanguage(config: Config, articles: Article[]) {
     article.titleTranslation = String(data.translation)
       .split(' ')
       .map(
-        w => { 
-          let s = w.split(''); 
-          s[0] = s[0].toUpperCase(); 
-          return s.join('') 
-      })
+        w => {
+          let s = w.split('');
+          s[0] = s[0].toUpperCase();
+          return s.join('')
+        })
       .join('-')
   }
   console.log('全部翻译完成')
   return;
+}
+
+async function mkdir(path: string): Promise<void> {
+  try {
+    console.log('生成文件夹: ' + path);
+    return new Promise((resolve, reject) => {
+      fs.mkdir(path, { recursive: true }, (err) => {
+        if (err) {
+          throw err;
+        } else {
+          console.log('success');
+          resolve();
+        }
+      })
+    });
+  } catch (e) {
+    console.log('use exist dir: ' + path);
+    return Promise.resolve();
+  }
+}
+
+function getSalt(len: 5, exclude: string[]): string {
+  let range = 'abcdefghigklmnopqrstuvwxyz';
+  let ret: string = '';
+  for (let i = 0; i < len; i++) {
+    let index = Math.floor(Math.random() * 26);
+    ret += range[index];
+  }
+  if(exclude.includes(ret)) return getSalt(len, exclude);
+  else return ret;
 }
